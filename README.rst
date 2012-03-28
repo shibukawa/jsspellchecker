@@ -6,9 +6,7 @@ This is research project.
 * Creates JS tokenizer from JSHint
 * Uses tokenizer for spell checking
 
-Now this checker program gethers valid method name from following syntax:
-
-.. code-block:: javascript
+Now this checker program gethers valid method name from following syntax::
 
    // Style 1
    {
