@@ -3,4 +3,4 @@ exports.ImportedClass = {
     {
         console.log();
     }
-}
+};

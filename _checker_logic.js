@@ -1,10 +1,11 @@
 var fs = require('fs');
+var path = require('path');
 var jshint = require('./jshint').JSHINT;
 var Parser = require('./parser').Parser;
 
 
 var SpellChecker = function () {
-    var definedMethods = [
+    var predefinedMethods = [
         ["hasOwnProperty", "ECMA"],
         ["toString", "ECMA"],
         ["parse", "ECMA"],
@@ -55,33 +56,35 @@ var SpellChecker = function () {
         ["readFile", "ngCore"]
     ];
 
-    var validMethods = [];
-    var validMap = {};
-    var errors = [];
-
-    function registerMethod(methodName, option)
+    this.registerMethod = function (methodName, option)
     {
-        if (validMap[methodName] === "valid")
+        if (this.validMap[methodName] === "valid")
         {
-            console.log("dump: " + methodName);
+            console.log("dupe: " + methodName);
         }
-        if (validMethods[methodName.length] === undefined)
+        if (this.validMethods[methodName.length] === undefined)
         {
-            validMethods[methodName.length] = [[methodName, option]];
+            this.validMethods[methodName.length] = [[methodName, option]];
         }
         else
         {
-            validMethods[methodName.length].push([methodName, option]);
+            this.validMethods[methodName.length].push([methodName, option]);
         }
-        validMap[methodName] = "valid";
-    }
+        this.validMap[methodName] = "valid";
+    };
 
     function init()
     {
-        for (var i = 0; i < definedMethods.length; i++)
+        this.validMethods = [];
+        this.validMap = {};
+        this.requires = [];
+        this.loadedFile = {};
+        this.checktarget = [];
+
+        for (var i = 0; i < predefinedMethods.length; i++)
         {
-            var method = definedMethods[i];
-            registerMethod(method[0], method[1]);
+            var method = predefinedMethods[i];
+            this.registerMethod(method[0], method[1]);
         }
     }
 
@@ -113,10 +116,20 @@ var SpellChecker = function () {
         }
     };
 
-    var findMethodName = function (tokens, jsdocs)
+    var fixPath = function (basepath, filepath)
+    {
+        var dir = path.dirname(basepath);
+        if (filepath.charAt(0) !== '.')
+        {
+            return filepath;
+        }
+        return path.join(dir, filepath);
+    };
+
+    this.findMethodName = function (tokens, path)
     {
         var i = 0;
-        var checktarget = [];
+        var checktarget = this.checktarget;
         for (;;)
         {
             var token = tokens[i];
@@ -129,7 +142,7 @@ var SpellChecker = function () {
                 if (tokens[i - 1].identifier && tokens[i + 1].value === "function")
                 {
                     var methodname = tokens[i - 1].value;
-                    registerMethod(methodname, "line " + tokens[i - 1].line);
+                    this.registerMethod(methodname, "line " + tokens[i - 1].line + " in " + path);
                     i += 3;
                 }
             }
@@ -146,7 +159,17 @@ var SpellChecker = function () {
                         tokens[i - 3].identifier && tokens[i - 4].value === "." &&
                         tokens[i - 5].value === "prototype")
                 {
-                    registerMethod(tokens[i - 3].value, "line " + tokens[i - 1].line);
+                    this.registerMethod(tokens[i - 3].value, "line " + tokens[i - 1].line + " in " + path);
+                }
+                else if (tokens[i - 1].value === "require")
+                {
+                    var requirepath = fixPath(path, tokens[i + 1].value);
+                    console.log("require " + path + "-> " + requirepath);
+                    if (!this.loadedFile[requirepath])
+                    {
+                        this.loadedFile[requirepath] = true;
+                        this.requires.push(requirepath);
+                    }
                 }
             }
             i++;
@@ -229,16 +252,18 @@ var SpellChecker = function () {
         return v0[s1_len];
     }
 
-    var checkMethodName = function (methodname, linenumber)
+    this.checkMethodName = function (index)
     {
-        if (validMap[methodname] === "valid")
+        var methodname = this.checktarget[index][0];
+        var linenumber = this.checktarget[index][1];
+        if (this.validMap[methodname] === "valid")
         {
             return;
         }
         var suggests = [];
         for (var i = methodname.length - 2; i < methodname.length + 2; ++i)
         {
-            var methods = validMethods[i];
+            var methods = this.validMethods[i];
             if (methods !== undefined)
             {
                 for (var j = 0; j < methods.length; j++)
@@ -262,14 +287,13 @@ var SpellChecker = function () {
 
     this.check = function (path)
     {
-        var data = fs.readFileSync(path, "utf-8");
-        if (jshint(data)) {
-            var tokens = jshint.tokens();
-            var errors = [];
-            var checktarget = findMethodName(tokens);
-            for (var i = 0; i < checktarget.length; ++i)
+        var errors = [];
+        this.readFile(path);
+        if (this.checktarget.length > 0)
+        {
+            for (var i = 0; i < this.checktarget.length; ++i)
             {
-                var error = checkMethodName(checktarget[i][0], checktarget[i][1]);
+                var error = this.checkMethodName(i);
                 if (error)
                 {
                     errors.push(error);
@@ -278,6 +302,37 @@ var SpellChecker = function () {
             return errors;
         }
         return [];
+    };
+
+    this.readFile = function (filepath)
+    {
+        if (filepath.lastIndexOf(".js") !== filepath.length - 3)
+        {
+            filepath = filepath + ".js";
+        }
+
+        if (!path.existsSync(filepath))
+        {
+            console.log("Required file " + filepath + " is not exists");
+            return;
+        }
+
+        var data = fs.readFileSync(filepath, "utf-8");
+        if (jshint(data))
+        {
+            var tokens = jshint.tokens();
+            this.findMethodName(tokens, filepath);
+            var requires = this.requires;
+            this.requires = [];
+            for (var i = 0; i < requires.length; ++i)
+            {
+                this.readFile(requires[i]);
+            }
+        }
+        else
+        {
+            console.log(path + " has syntax error. Please check code with jshint before checking spelling.");
+        }
     };
 
     init.call(this);
