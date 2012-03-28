@@ -1,6 +1,8 @@
 JSSpellChecker
 ==============
 
+
+
 This is research project.
 
 * Creates JS tokenizer from JSHint
@@ -19,6 +21,21 @@ Now this checker program gethers valid method name from following syntax::
 Any keywords which have paren and dot(.) prefix and don't have new are treated method call.
 The result of Levenshtein Distance between valid method names and names used at method call
 are 1 to 3, this program reports this result as spell fluctuation.
+
+Usage
+=====
+
+Run ``checker.js`` with node.js::
+
+   $ node checker.js testdata/ng.js 
+   varidMethod (line 9)
+       -> 1: validMethod (line 2)
+   destory (line 10)
+       -> 1: destroy (ngCore)
+   settext (line 11)
+       -> 1: setText (ngCore)
+   text (line 12)
+       -> 1: test (line 7)
 
 Author
 ======
