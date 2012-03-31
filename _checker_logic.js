@@ -25,42 +25,18 @@ var SpellChecker = function () {
         ["ceil", "ECMA"],
         ["floor", "ECMA"],
         ["toLowerCase", "ECMA"],
-        ["toUpperCase", "ECMA"],
-        ["destroy", "ngCore"],
-        ["subclass", "ngCore"],
-        ["singleton", "ngCore"],
-        ["addChild", "ngCore"],
-        ["removeChild", "ngCore"],
-        ["getTouchEmitter", "ngCore"],
-        ["addListener", "ngCore"],
-        ["removeListener", "ngCore"],
-        ["setInterfaceOrientation", "ngCore"],
-        ["getWidth", "ngCore"],
-        ["getHeight", "ngCore"],
-        ["getOuterWidth", "ngCore"],
-        ["getOuterHeight", "ngCore"],
-        ["getScreenWidth", "ngCore"],
-        ["getScreenHeight", "ngCore"],
-        ["getPlatformOS", "ngCore"],
-        ["setPosition", "ngCore"],
-        ["getPosition", "ngCore"],
-        ["setRotation", "ngCore"],
-        ["getRotation", "ngCore"],
-        ["setScale", "ngCore"],
-        ["getScale", "ngCore"],
-        ["setDepth", "ngCore"],
-        ["getDepth", "ngCore"],
-        ["setAnchor", "ngCore"],
-        ["getAnchor", "ngCore"],
-        ["setText", "ngCore"],
-        ["readFile", "ngCore"]
+        ["toUpperCase", "ECMA"]
     ];
 
     this._registerMethod = function (methodName, option)
     {
+        if (methodName.charAt(0) === "$")
+        {
+            methodName = methodName.substring(1);
+        }
         if (this._validMap[methodName] === "valid")
         {
-            console.log("dupe: " + methodName);
+            return;
         }
         if (this._validMethods[methodName.length] === undefined)
         {
@@ -135,7 +111,7 @@ var SpellChecker = function () {
         for (;;)
         {
             var token = tokens[i];
-            if (token.type === "(end)")
+            if (tokens.length <= i || token.type === "(end)")
             {
                 return;
             }
@@ -150,7 +126,11 @@ var SpellChecker = function () {
             }
             else if (token.value === "(" && token.type === "(punctuator)")
             {
-                if (tokens[i - 1].identifier && tokens[i - 2].value === ".")
+                if (tokens[i - 1] === undefined)
+                {
+                    // do noting
+                }
+                else if (tokens[i - 1].identifier && tokens[i - 2].value === ".")
                 {
                     if (!startsWithNew(tokens, i))
                     {
@@ -163,9 +143,13 @@ var SpellChecker = function () {
                 {
                     this._registerMethod(tokens[i - 3].value, "line " + tokens[i - 1].line + " in " + sourcepath);
                 }
-                else if (tokens[i - 1].value === "require")
+                else if (tokens[i - 1].value === "require" && tokens[i + 1].type === '(string)')
                 {
                     var requirepath = fixPath(sourcepath, tokens[i + 1].value);
+                    if (this._verbose)
+                    {
+                        console.log("  '" + sourcepath + "' requires '" + requirepath + "'");
+                    }
                     if (!this._loadedFile[requirepath])
                     {
                         this._loadedFile[requirepath] = true;
@@ -177,7 +161,7 @@ var SpellChecker = function () {
         }
     };
 
-    function levenshtein(s1, s2)
+    function levenshtein(s1, s2, distance)
     {
         // http://kevin.vanzonneveld.net
         // +            original by: Carlos R. L. Rodrigues (http://www.jsfromhell.com)
@@ -196,15 +180,18 @@ var SpellChecker = function () {
         var s1_len = s1.length;
         var s2_len = s2.length;
 
-        if (Math.abs(s1_len - s2_len) > 2)
+        if (Math.abs(s1_len - s2_len) > distance)
         {
             return 100;
         }
         // BEGIN STATIC
         var split = false;
-        try {
+        try
+        {
             split = !('0')[0];
-        } catch (e) {
+        }
+        catch (e)
+        {
             split = true; // Earlier IE may not support access by string index
         }
         // END STATIC
@@ -273,8 +260,8 @@ var SpellChecker = function () {
                 for (var j = 0; j < methods.length; j++)
                 {
                     var method = methods[j];
-                    var score = levenshtein(methodname, method[0]);
-                    if (score < 3)
+                    var score = levenshtein(methodname, method[0], this._distance);
+                    if (score <= this._distance)
                     {
                         suggests.push([score, method[0], method[1]]);
                     }
@@ -291,8 +278,11 @@ var SpellChecker = function () {
         };
     };
 
-    this.check = function (path)
+    this.check = function (path, option)
     {
+        this._verbose = option.verbose;
+        this._distance = option.distance;
+        this._ignoreWarning = option.ignoreWarning;
         this._readFile(path);
     };
 
@@ -340,8 +330,55 @@ var SpellChecker = function () {
         }
     };
 
+    var _isMatch = function (path, pattern)
+    {
+        pattern.replace("\\", "\\\\");
+        pattern = pattern.replace(".", "\\.");
+        pattern = pattern.replace("?", ".");
+        pattern = pattern.replace("*", ".*");
+        var reg = new RegExp(pattern);
+        return reg.test(path);
+    }
+
     this._readFile = function (filepath, sourcepath, line)
     {
+        if (filepath.lastIndexOf(".json") === filepath.length - 5)
+        {
+            if (!path.existsSync(filepath))
+            {
+                this._requireErrors.push({filepath: filepath,  sourcepath: sourcepath});
+                this._hasFatalError = true;
+                return;
+            }
+            var json;
+            try
+            {
+                json = JSON.parse(fs.readFileSync(filepath, "utf-8"));
+            }
+            catch (e)
+            {
+                console.log("JSON syntax error: " + filepath);
+                this._hasFatalError = true;
+                return;
+            }
+            var i;
+            if (json.code_encrypted)
+            {
+                for (i = 0; i < json.code_encrypted.length; i++)
+                {
+                    this._readFile(fixPath(filepath, json.code_encrypted[i])); 
+                }
+            }
+            if (json.code)
+            {
+                for (i = 0; i < json.code.length; i++)
+                {
+                    this._readFile(fixPath(filepath, json.code[i])); 
+                }
+            }
+            return;
+        }
+
         if (filepath.lastIndexOf(".js") !== filepath.length - 3)
         {
             filepath = filepath + ".js";
@@ -355,29 +392,36 @@ var SpellChecker = function () {
         }
 
         var data = fs.readFileSync(filepath, "utf-8");
-        if (jshint(data))
+        var option = {
+            asi: true,
+            es5: true,
+            ignoreWarning: _isMatch(filepath, this._ignoreWarning)
+        }
+        if (jshint(data, option))
         {
             this._runCheck(jshint.tokens(), filepath);
         }
-        else
+        else //if (!option.ignoreWarning)
         {
-            var can_run = true;
             var errors = jshint.data().errors;
             var fatalError = false;
             for (var j = 0; j < errors.length; j++)
             {
                 var error = errors[j];
-                error.filepath = filepath;
-                this._syntaxErrors.push(error);
-                switch (error.reason)
+                if (error)
                 {
-                case "Missing semicolon.":
-                    break;
-                case "Extra comma.":
-                    break;
-                default:
-                    fatalError = true;
-                    break;
+                    error.filepath = filepath;
+                    this._syntaxErrors.push(error);
+                    switch (error.reason)
+                    {
+                    case "Missing semicolon.":
+                        break;
+                    case "Extra comma.":
+                        break;
+                    default:
+                        fatalError = true;
+                        break;
+                    }
                 }
             }
             if (fatalError)
@@ -389,6 +433,10 @@ var SpellChecker = function () {
                 this._runCheck(jshint.tokens(), filepath);
             }
         }
+        /*else
+        {
+            this._runCheck(jshint.tokens(), filepath);
+        }*/
     };
 
     init.call(this);

@@ -1,0 +1,6 @@
+{
+    "code": [
+        "./parent.js",
+        "./ok.js"
+    ]
+}

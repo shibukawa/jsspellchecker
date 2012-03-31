@@ -1031,7 +1031,7 @@ var JSHINT = (function () {
             else
                 at = s.search(/ \t|\t /);
 
-            if (at >= 0)
+            if (at >= 0 && !option.ignoreWarning)
                 warningAt("Mixed spaces and tabs.", line, at + 1);
 
             s = s.replace(/\t/g, tab);
@@ -1277,7 +1277,8 @@ unclosedString:     for (;;) {
                                     line, character);
                                 break;
                             default:
-                                warningAt("Bad escapement.", line, character);
+                                if (!option.ignoreWarning)
+                                    warningAt("Bad escapement.", line, character);
                             }
                         }
                         r += c;
@@ -1567,7 +1568,7 @@ klass:                                  do {
                                                 }
                                                 break;
                                             case ']':
-                                                if (isInRange && !option.regexdash) {
+                                                if (isInRange && !option.regexdash && !option.ignoreWarning) {
                                                     warningAt("Unescaped '{a}'.",
                                                             line, from + l - 1, '-');
                                                 }
@@ -1746,7 +1747,7 @@ klass:                                  do {
                 if (option.latedef)
                     warning("'{a}' was used before it was defined.", nexttoken, t);
             } else {
-                if (!option.shadow && type !== "exception")
+                if (!option.shadow && type !== "exception" && !option.ignoreWarning)
                     warning("'{a}' is already defined.", nexttoken, t);
             }
         }
@@ -1905,7 +1906,8 @@ loop:   for (;;) {
             break;
         case '+':
             if (nexttoken.id === '+' || nexttoken.id === '++') {
-                warning("Confusing plusses.");
+                if (!option.ignoreWarning)
+                    warning("Confusing plusses.");
             }
             break;
         }
@@ -1918,13 +1920,14 @@ loop:   for (;;) {
             if (t) {
                 if (nexttoken.id === '(end)') {
                     warning("Unmatched '{a}'.", t, t.id);
-                } else {
+                } else if (!option.ignoreWarning) {
                     warning("Expected '{a}' to match '{b}' from line {c} and instead saw '{d}'.",
                             nexttoken, id, t.id, t.line, nexttoken.value);
                 }
             } else if (nexttoken.type !== '(identifier)' ||
                             nexttoken.value !== id) {
-                warning("Expected '{a}' and instead saw '{b}'.",
+                if (!option.ignoreWarning)
+                    warning("Expected '{a}' and instead saw '{b}'.",
                         nexttoken, id, nexttoken.value);
             }
         }
@@ -1983,7 +1986,7 @@ loop:   for (;;) {
                             token, nexttoken.value);
                     advance();
                     return token;
-                } else {
+                } else if (!option.ignoreWarning) {
                     error("Expected an identifier and instead saw '{a}'.",
                             token, token.id);
                 }
@@ -1991,7 +1994,7 @@ loop:   for (;;) {
             while (rbp < nexttoken.lbp) {
                 isArray = token.value === 'Array';
                 advance();
-                if (isArray && token.id === '(' && nexttoken.id === ')')
+                if (isArray && token.id === '(' && nexttoken.id === ')' && !option.ignoreWarning)
                     warning("Use the array literal notation [].", token);
                 if (token.led) {
                     left = token.led(left);
@@ -2051,7 +2054,7 @@ loop:   for (;;) {
     function nobreaknonadjacent(left, right) {
         left = left || token;
         right = right || nexttoken;
-        if (!option.laxbreak && left.line !== right.line) {
+        if (!option.laxbreak && left.line !== right.line && !option.ignoreWarning) {
             warning("Bad line breaking before '{a}'.", right, right.id);
         } else if (option.white) {
             left = left || token;
@@ -2375,7 +2378,8 @@ loop:   for (;;) {
             return i;
         }
         if (token.id === 'function' && nexttoken.id === '(') {
-            warning("Missing name in function declaration.");
+            if (!option.ignoreWarning)
+                warning("Missing name in function declaration.");
         } else {
             error("Expected an identifier and instead saw '{a}'.",
                     nexttoken, nexttoken.value);
@@ -2446,7 +2450,7 @@ loop:   for (;;) {
 
         // Look for the final semicolon.
         if (!t.block) {
-            if (!option.expr && (!r || !r.exps)) {
+            if (!option.expr && (!r || !r.exps) && !option.ignoreWarning) {
                 warning("Expected an assignment or function call and instead saw an expression.",
                     token);
             } else if (option.nonew && r.id === '(' && r.left.id === 'new') {
@@ -2484,7 +2488,7 @@ loop:   for (;;) {
         while (!nexttoken.reach && nexttoken.id !== '(end)') {
             if (nexttoken.id === ';') {
                 p = peek();
-                if (!p || p.id !== "(") {
+                if ((!p || p.id !== "(") && !option.ignoreWarning) {
                     warning("Unnecessary semicolon.");
                 }
                 advance(';');
@@ -2745,7 +2749,8 @@ loop:   for (;;) {
                 case 'function':
                 case 'var':
                 case 'unused':
-                    warning("'{a}' used out of scope.", token, v);
+                    if (!option.ignoreWarning)
+                        warning("'{a}' used out of scope.", token, v);
                     break;
                 case 'label':
                     warning("'{a}' is a statement label.", token, v);
@@ -2889,9 +2894,11 @@ loop:   for (;;) {
         if (!eqnull && option.eqeqeq)
             warning("Expected '{a}' and instead saw '{b}'.", this, '===', '==');
         else if (isPoorRelation(left))
-            warning("Use '{a}' to compare with '{b}'.", this, '===', left.value);
+            if (!option.ignoreWarning)
+                warning("Use '{a}' to compare with '{b}'.", this, '===', left.value);
         else if (isPoorRelation(right))
-            warning("Use '{a}' to compare with '{b}'.", this, '===', right.value);
+            if (!option.ignoreWarning)
+                warning("Use '{a}' to compare with '{b}'.", this, '===', right.value);
 
         return this;
     });
@@ -2904,10 +2911,12 @@ loop:   for (;;) {
             warning("Expected '{a}' and instead saw '{b}'.",
                     this, '!==', '!=');
         } else if (isPoorRelation(left)) {
-            warning("Use '{a}' to compare with '{b}'.",
+            if (!option.ignoreWarning)
+                warning("Use '{a}' to compare with '{b}'.",
                     this, '!==', left.value);
         } else if (isPoorRelation(right)) {
-            warning("Use '{a}' to compare with '{b}'.",
+            if (!option.ignoreWarning)
+                warning("Use '{a}' to compare with '{b}'.",
                     this, '!==', right.value);
         }
         return this;
@@ -2994,7 +3003,7 @@ loop:   for (;;) {
     prefix('!', function () {
         this.right = expression(150);
         this.arity = 'unary';
-        if (bang[this.right.id] === true) {
+        if (bang[this.right.id] === true && !option.ignoreWarning) {
             warning("Confusing use of '{a}'.", this, '!');
         }
         return this;
@@ -3014,7 +3023,8 @@ loop:   for (;;) {
                 case 'Boolean':
                 case 'Math':
                 case 'JSON':
-                    warning("Do not use {a} as a constructor.", token, c.value);
+                    if (!option.ignoreWarning)
+                        warning("Do not use {a} as a constructor.", token, c.value);
                     break;
                 case 'Function':
                     if (!option.evil) {
@@ -3071,7 +3081,7 @@ loop:   for (;;) {
                 (m === 'write' || m === 'writeln')) {
             warning("document.write can be a form of eval.", left);
         }
-        if (!option.evil && (m === 'eval' || m === 'execScript')) {
+        if (!option.evil && (m === 'eval' || m === 'execScript') && !option.ignoreWarning) {
             warning('eval is evil.');
         }
         return that;
@@ -3118,13 +3128,14 @@ loop:   for (;;) {
         advance(')');
         nospace(prevtoken, token);
         if (typeof left === 'object') {
-            if (left.value === 'parseInt' && n === 1) {
+            if (left.value === 'parseInt' && n === 1 && !option.ignoreWarning) {
                 warning("Missing radix parameter.", left);
             }
             if (!option.evil) {
                 if (left.value === 'eval' || left.value === 'Function' ||
                         left.value === 'execScript') {
-                    warning("eval is evil.", left);
+                    if (!option.ignoreWarning)
+                        warning("eval is evil.", left);
                 } else if (p[0] && p[0].id === '(string)' &&
                        (left.value === 'setTimeout' ||
                         left.value === 'setInterval')) {
@@ -3175,7 +3186,7 @@ loop:   for (;;) {
             countMember(e.value);
             if (!option.sub && ix.test(e.value)) {
                 s = syntax[e.value];
-                if (!s || !s.reserved) {
+                if ((!s || !s.reserved) && !option.ignoreWarning) {
                     warning("['{a}'] is better written in dot notation.",
                             e, e.value);
                 }
@@ -3211,7 +3222,7 @@ loop:   for (;;) {
             this.first.push(expression(10));
             if (nexttoken.id === ',') {
                 comma();
-                if (nexttoken.id === ']' && !option.es5) {
+                if (nexttoken.id === ']' && !option.es5 && !option.ignoreWarning) {
                     warning("Extra comma.", token);
                     break;
                 }
@@ -3428,7 +3439,8 @@ loop:   for (;;) {
             return this;
         };
         x.fud = function () {
-            error("Expected to see a statement and instead saw a block.", token);
+            if (!option.ignoreWarning)
+                error("Expected to see a statement and instead saw a block.", token);
         };
     }(delim('{')));
 
@@ -3465,7 +3477,7 @@ loop:   for (;;) {
                     nonadjacent(token, nexttoken);
                     advance('=');
                     nonadjacent(token, nexttoken);
-                    if (nexttoken.id === 'undefined') {
+                    if (nexttoken.id === 'undefined' && !option.ignoreWarning) {
                         warning("It is not necessary to initialize " +
                           "'{a}' to 'undefined'.", token, id);
                     }
@@ -3517,7 +3529,7 @@ loop:   for (;;) {
                 nonadjacent(token, nexttoken);
                 advance('=');
                 nonadjacent(token, nexttoken);
-                if (nexttoken.id === 'undefined') {
+                if (nexttoken.id === 'undefined' && !option.ignoreWarning) {
                     warning("It is not necessary to initialize '{a}' to 'undefined'.", token, id);
                 }
                 if (peek(0).id === '=' && nexttoken.identifier) {
@@ -3565,7 +3577,7 @@ loop:   for (;;) {
             nonadjacent(token, nexttoken);
         }
         doFunction(i);
-        if (!option.loopfunc && funct['(loopage)']) {
+        if (!option.loopfunc && funct['(loopage)'] && !option.ignoreWarning) {
             warning("Don't make functions within a loop.");
         }
         return this;
@@ -3578,7 +3590,7 @@ loop:   for (;;) {
         nospace();
         expression(20);
         if (nexttoken.id === '=') {
-            if (!option.boss)
+            if (!option.boss && !option.ignoreWarning)
                 warning("Expected a conditional expression and instead saw an assignment.");
             advance('=');
             expression(20);
@@ -3641,7 +3653,7 @@ loop:   for (;;) {
         nospace();
         expression(20);
         if (nexttoken.id === '=') {
-            if (!option.boss)
+            if (!option.boss && !option.ignoreWarning)
                 warning("Expected a conditional expression and instead saw an assignment.");
             advance('=');
             expression(20);
@@ -3687,7 +3699,7 @@ loop:   for (;;) {
                     // You can tell JSHint that you don't use break intentionally by
                     // adding a comment /* falls through */ on a line just before
                     // the next `case`.
-                    if (!ft.test(lines[nexttoken.line - 2])) {
+                    if (!ft.test(lines[nexttoken.line - 2]) && !option.ignoreWarning) {
                         warning(
                             "Expected a 'break' statement before 'case'.",
                             token);
@@ -3708,7 +3720,7 @@ loop:   for (;;) {
                 case 'throw':
                     break;
                 default:
-                    if (!ft.test(lines[nexttoken.line - 2])) {
+                    if (!ft.test(lines[nexttoken.line - 2]) && !option.ignoreWarning) {
                         warning(
                             "Expected a 'break' statement before 'default'.",
                             token);
@@ -3725,7 +3737,7 @@ loop:   for (;;) {
                 advance('}', t);
                 if (this.cases.length === 1 || this.condition.id === 'true' ||
                         this.condition.id === 'false') {
-                    if (!option.onecase)
+                    if (!option.onecase && !option.ignoreWarning)
                         warning("This 'switch' should be an 'if'.", this);
                 }
                 funct['(breakage)'] -= 1;
@@ -3816,7 +3828,8 @@ loop:   for (;;) {
                 case 'var':
                     break;
                 default:
-                    warning("Bad for in variable '{a}'.",
+                    if (!option.ignoreWarning)
+                        warning("Bad for in variable '{a}'.",
                             nexttoken, nexttoken.value);
                 }
                 advance();
@@ -3887,7 +3900,7 @@ loop:   for (;;) {
     stmt('break', function () {
         var v = nexttoken.value;
 
-        if (funct['(breakage)'] === 0)
+        if (funct['(breakage)'] === 0 && !option.ignoreWarning)
             warning("Unexpected '{a}'.", nexttoken, this.value);
 
         if (!option.asi)
@@ -3912,7 +3925,7 @@ loop:   for (;;) {
     stmt('continue', function () {
         var v = nexttoken.value;
 
-        if (funct['(breakage)'] === 0)
+        if (funct['(breakage)'] === 0 && !option.ignoreWarning)
             warning("Unexpected '{a}'.", nexttoken, this.value);
 
         if (!option.asi)
@@ -3928,7 +3941,7 @@ loop:   for (;;) {
                 this.first = nexttoken;
                 advance();
             }
-        } else if (!funct['(loopage)']) {
+        } else if (!funct['(loopage)'] && !option.ignoreWarning) {
             warning("Unexpected '{a}'.", nexttoken, this.value);
         }
         reachable('continue');

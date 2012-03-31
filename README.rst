@@ -1,8 +1,6 @@
 JSSpellChecker
 ==============
 
-
-
 This is research project.
 
 * Creates JS tokenizer from JSHint
@@ -40,9 +38,13 @@ Run ``checker.js`` with node.js::
 Author
 ======
 
-Yoshiki Shibukawa
+Yoshiki Shibukawa (shibukawa.yoshiki at dena.jp / yshibukawa at ngmoco.com)
 
 License
 =======
 
-MIT/X License
+This is released under MIT/X License
+
+It uses customized JSHint as JavaScript tokenizer. It is created by JSHint team under MIT License.
+
+`opts.js <https://bitbucket.org/mazzarelli/js-opts/downloads>`_ is created by Joey Mazzarelli under Simpified BSD License.

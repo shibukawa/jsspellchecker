@@ -1,11 +1,12 @@
+var opts = require('./opts');
 var SpellChecker = require('./_checker_logic').SpellChecker;
 
 
-function main(path)
+function main(path, option)
 {
     var checker = new SpellChecker();
     var i;
-    checker.check(path);
+    checker.check(path, option);
 
     var requireErrors = checker.requireErrors();
     for (i = 0; i < requireErrors.length; i++)
@@ -13,13 +14,13 @@ function main(path)
         var filepath = requireErrors[i].filepath;
         var sourcepath = requireErrors[i].sourcepath;
         var line = requireErrors[i].line;
-        if (sourcepath)
+        if (line)
         {
             console.log("Required file '" + filepath + "' from '" + sourcepath + "' (line " + line + ") is not exists");
         }
         else
         {
-            console.log("Required file " + filepath + " is not exists.");
+            console.log("Required file '" + filepath + "' from '" + sourcepath + "' is not exists");
         }
     }
 
@@ -96,15 +97,65 @@ function main(path)
     if (summary.length > 0)
     {
         console.log(summary.join(", ") + " founds.");
+        process.exit(1);
     }
+    process.exit(0);
 }
 
-if (process.argv.length !== 3)
+
+var version = "1.0";
+
+
+var options =
+[
+    {
+        short: 'd',
+        long: 'distance',
+        description: 'Levenshtein Distance to find near method names. Default is 2',
+        value: true
+    },
+    {
+        short: 'i',
+        long: 'ignorewarning',
+        description: 'File name pattern for ignoring JavaScript syntax warning. Sample: "*/lib/*"',
+        value: true
+    },
+    {
+        short: 'v',
+        long: 'verbose',
+        description: 'Dump require function call.'
+    },
+    {
+        short: 'V',
+        long: 'version',
+        description: 'Show version and exit',
+        callback: function ()
+        {
+            console.log("JSSpellChecker version." + version + " by Yoshiki Shibukawa");
+            process.exit(1);
+        }
+    }
+];
+
+
+var args =
+[
+    {
+        name: 'script',
+        required: true
+    }
+]
+
+
+opts.parse(options, args, true);
+
+
+var option =
 {
-    console.log("usage:");
-    console.log("    node checker.js [javascript-source-path]");
-}
-else
-{
-    main(process.argv[2]);
-}
+    verbose: opts.get('v'),
+    distance: opts.get('d') || 2,
+    ignoreWarning: opts.get('i')
+};
+
+
+main(opts.arg('script'), option);
