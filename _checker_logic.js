@@ -5,29 +5,6 @@ var Parser = require('./parser').Parser;
 
 
 var SpellChecker = function () {
-    var predefinedMethods = [
-        ["hasOwnProperty", "ECMA"],
-        ["toString", "ECMA"],
-        ["parse", "ECMA"],
-        ["stringify", "ECMA"],
-        ["log", "ECMA"],
-        ["isNaN", "ECMA"],
-        ["push", "ECMA"],
-        ["pop", "ECMA"],
-        ["sort", "ECMA"],
-        ["reverse", "ECMA"],
-        ["slice", "ECMA"],
-        ["splice", "ECMA"],
-        ["max", "ECMA"],
-        ["min", "ECMA"],
-        ["sin", "ECMA"],
-        ["cos", "ECMA"],
-        ["ceil", "ECMA"],
-        ["floor", "ECMA"],
-        ["toLowerCase", "ECMA"],
-        ["toUpperCase", "ECMA"]
-    ];
-
     this._registerMethod = function (methodName, option)
     {
         if (methodName.charAt(0) === "$")
@@ -60,10 +37,11 @@ var SpellChecker = function () {
         this._requireErrors = [];
         this._syntaxErrors = [];
 
+        var predefinedMethods = require('./_predefined_method').predefinedMethods;
         for (var i = 0; i < predefinedMethods.length; i++)
         {
             var method = predefinedMethods[i];
-            this._registerMethod(method[0], method[1]);
+            this._registerMethod(method.word, method.desc);
         }
     }
 
