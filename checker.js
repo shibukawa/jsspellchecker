@@ -1,5 +1,5 @@
 var opts = require('./opts');
-var SpellChecker = require('./_checker_logic').SpellChecker;
+var SpellChecker = require('./_jsspellcheck').SpellChecker;
 
 
 function main(path, option)
@@ -39,14 +39,17 @@ function main(path, option)
 
     var spellErrors;
 
-    if (checker.hasFatalError())
+    if (option.requireOnly || checker.hasFatalError())
     {
         spellErrors = [];
         if ((syntaxErrors.length > 0) || (requireErrors.length > 0 && syntaxErrors.length === 0))
         {
             console.log("");
         }
-        console.log("There are errors. Please fix them before spell checking.");
+        if (checker.hasFatalError())
+        {
+            console.log("There are errors. Please fix them before spell checking.");
+        }
     }
     else
     {
@@ -111,8 +114,13 @@ var options =
     {
         short: 'd',
         long: 'distance',
-        description: 'Levenshtein Distance to find near method names. Default is 2',
+        description: 'Damerau-Levenshtein Distance to find near method names. Default is 2',
         value: true
+    },
+    {
+        short: 'r',
+        long: 'requirecheck',
+        description: 'Check require only'
     },
     {
         short: 'i',
@@ -154,7 +162,8 @@ var option =
 {
     verbose: opts.get('v'),
     distance: opts.get('d') || 2,
-    ignoreWarning: opts.get('i')
+    ignoreWarning: opts.get('i'),
+    requireOnly: opts.get('r')
 };
 
 

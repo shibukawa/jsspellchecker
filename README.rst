@@ -35,6 +35,26 @@ Run ``checker.js`` with node.js::
    text (line 12)
        -> 1: test (line 7)
 
+Option
+======
+
+There are several options::
+
+   Usage: node checker.js [options] script
+   Show this help message
+       --help
+   Show version and exit
+       -V, --version
+   Dump require function call.
+       -v, --verbose
+   File name pattern for ignoring JavaScript syntax warning. Sample: "*/lib/*"
+       -i, --ignorewarning <value>
+   Check require only
+       -r, --requirecheck
+   Damerau-Levenshtein Distance to find near method names. Default is 2
+       -d, --distance <value>
+
+
 Author
 ======
 
