@@ -70,7 +70,14 @@ function main(path, option)
             for (var j = 0; j < spellError.suggests.length; j++)
             {
                 var suggest = spellError.suggests[j];
-                console.log("    -> " + (j + 1) + ": " + suggest[1] + " (" + suggest[2] + ")");
+                if (suggest[3])
+                {
+                    console.log("    -> " + (j + 1) + ": " + suggest[1] + "() (line " + suggest[3] + " in " + suggest[2] + ")");
+                }
+                else
+                {
+                    console.log("    -> " + (j + 1) + ": " + suggest[1] + "() (from " + suggest[2] + ")");
+                }
             }
         }
         else

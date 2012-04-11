@@ -1,43 +1,21 @@
 var fs;
 var path;
-
-try {
+try
+{
     fs = require('fs');
     path = require('path');
 }
 catch (e)
 {
-    fs = require('./fs');
-    path = require('./path');
+    fs = require('./_fs');
+    path = require('./_path');
 }
 
-
-var jshint = require('./jsparser').JSHINT;
+var jshint = require('./_jsparser').JSHINT;
 var stringsDistance = require('./_distance').stringsDistance;
 
 
 var SpellChecker = function () {
-    this._registerMethod = function (methodName, option)
-    {
-        if (methodName.charAt(0) === "$")
-        {
-            methodName = methodName.substring(1);
-        }
-        if (this._validMap[methodName] === "valid")
-        {
-            return;
-        }
-        if (this._validMethods[methodName.length] === undefined)
-        {
-            this._validMethods[methodName.length] = [[methodName, option]];
-        }
-        else
-        {
-            this._validMethods[methodName.length].push([methodName, option]);
-        }
-        this._validMap[methodName] = "valid";
-    };
-
     function init()
     {
         this._validMethods = [];
@@ -48,7 +26,9 @@ var SpellChecker = function () {
         this._hasFatalError = false;
         this._requireErrors = [];
         this._syntaxErrors = [];
-
+        this._cache = {};
+        this._currentCache = undefined;
+        this._callback = function () {};
         var predefinedMethods = require('./_predefined_method').predefinedMethods;
         for (var i = 0; i < predefinedMethods.length; i++)
         {
@@ -95,6 +75,53 @@ var SpellChecker = function () {
         return path.join(dir, filepath);
     };
 
+    this._registerMethod = function (methodName, source, line)
+    {
+        if (methodName.charAt(0) === "$")
+        {
+            methodName = methodName.substring(1);
+        }
+        if (this._currentCache)
+        {
+            this._currentCache.validMethods.push([methodName, source, line]);
+        }
+        if (this._validMap[methodName] === "valid")
+        {
+            return;
+        }
+        if (this._validMethods[methodName.length] === undefined)
+        {
+            this._validMethods[methodName.length] = [[methodName, source, line]];
+        }
+        else
+        {
+            this._validMethods[methodName.length].push([methodName, source, line]);
+        }
+        this._validMap[methodName] = "valid";
+    };
+
+    this._addCheckTarget = function (targetInfo)
+    {
+        this._checkTarget.push(targetInfo);
+        if (this._currentCache)
+        {
+            this._currentCache.checkTargets.push(targetInfo);
+        }
+    };
+
+    this._addRequire = function (path, sourcepath, line)
+    {
+        if (this._currentCache)
+        {
+            this._currentCache.requires.push([path, sourcepath, line]);
+        }
+        if (!this._loadedFile[path])
+        {
+            this._loadedFile[path] = true;
+            this._requires.push([path, sourcepath, line]);
+        }
+    };
+
     this._findMethodName = function (tokens, sourcepath, ignoreWarning)
     {
         var i = 0;
@@ -110,7 +137,7 @@ var SpellChecker = function () {
                 if (tokens[i - 1].identifier && tokens[i + 1].value === "function")
                 {
                     var methodname = tokens[i - 1].value;
-                    this._registerMethod(methodname, "line " + tokens[i - 1].line + " in " + sourcepath);
+                    this._registerMethod(methodname, sourcepath, tokens[i - 1].line);
                     i += 3;
                 }
             }
@@ -124,14 +151,14 @@ var SpellChecker = function () {
                 {
                     if (!startsWithNew(tokens, i) && !ignoreWarning)
                     {
-                        this._checkTarget.push({methodname: tokens[i - 1].value, line: token.line, col: tokens[i - 1].from, filepath: sourcepath});
+                        this._addCheckTarget({methodname: tokens[i - 1].value, line: token.line, col: tokens[i - 1].from, filepath: sourcepath});
                     }
                 }
                 else if (tokens[i - 1].value === "function" && tokens[i - 2].value === "=" &&
                         tokens[i - 3].identifier && tokens[i - 4].value === "." &&
                         tokens[i - 5].value === "prototype")
                 {
-                    this._registerMethod(tokens[i - 3].value, "line " + tokens[i - 1].line + " in " + sourcepath);
+                    this._registerMethod(tokens[i - 3].value, sourcepath, tokens[i - 1].line);
                 }
                 else if (tokens[i - 1].value === "require" && tokens[i + 1].type === '(string)')
                 {
@@ -140,11 +167,7 @@ var SpellChecker = function () {
                     {
                         console.log("  '" + sourcepath + "' requires '" + requirepath + "'");
                     }
-                    if (!this._loadedFile[requirepath])
-                    {
-                        this._loadedFile[requirepath] = true;
-                        this._requires.push([requirepath, sourcepath, tokens[i - 1].line]);
-                    }
+                    this._addRequire(requirepath, sourcepath, tokens[i - 1].line);
                 }
             }
             i++;
@@ -174,7 +197,7 @@ var SpellChecker = function () {
                     var score = stringsDistance(methodname, method[0], this._distance);
                     if (score <= this._distance)
                     {
-                        suggests.push([score, method[0], method[1]]);
+                        suggests.push([score, method[0], method[1], method[2]]);
                     }
                 }
             }
@@ -189,12 +212,37 @@ var SpellChecker = function () {
         };
     };
 
-    this.check = function (path, option)
+    this.check = function (filepath, option)
     {
         this._verbose = option.verbose;
         this._distance = option.distance;
         this._ignoreWarning = option.ignoreWarning;
-        this._readFile(path);
+        if (option.callback)
+        {
+            this._callback = option.callback;
+        }
+        var cachepath;
+        if (filepath.lastIndexOf(".json") === filepath.length - 5)
+        {
+            cachepath = filepath.slice(0, filepath.length - 5) + ".methodspellcache";
+            if (path.existsSync(cachepath))
+            {
+                var content;
+                try
+                {
+                    this._cache = JSON.parse(fs.readFileSync(cachepath, "utf-8"));
+                }
+                catch (e)
+                {
+                    // do nothing
+                }
+            }
+        }
+        this._readFile(filepath);
+        if (cachepath)
+        {
+            fs.writeFileSync(cachepath, JSON.stringify(this._cache, undefined, 4), "utf-8");
+        }
     };
 
     this.hasFatalError = function ()
@@ -305,13 +353,55 @@ var SpellChecker = function () {
             this._hasFatalError = true;
             return;
         }
-
+        var mtime = fs.statSync(filepath).mtime.getTime();
+        if (this._cache[filepath])
+        {
+            var cachedContent = this._cache[filepath];
+            var stat = fs.statSync(filepath);
+            if (cachedContent.mtime === mtime)
+            {
+                this._currentCache = undefined;
+                var validMethods = cachedContent.validMethods;
+                for (i = 0; i < validMethods.length; ++i)
+                {
+                    var validMethod = validMethods[i];
+                    this._registerMethod(validMethod[0], validMethod[1], validMethod[2]);
+                }
+                var checkTargets = cachedContent.checkTargets;
+                for (i = 0; i < checkTargets.length; ++i)
+                {
+                    this._addCheckTarget(checkTargets[i])
+                }
+                var requires = cachedContent.requires;
+                for (i = 0; i < requires.length; ++i)
+                {
+                    var requireInfo = requires[i];
+                    this._addRequire(requireInfo[0], requireInfo[1], requireInfo[2]);
+                }
+                requires = this._requires;
+                this._requires = [];
+                for (var i = 0; i < requires.length; ++i)
+                {
+                    this._readFile(requires[i][0], requires[i][1], requires[i][2]);
+                }
+                return;
+            }
+        }
+        this._callback(filepath);
         var data = fs.readFileSync(filepath, "utf-8");
         var option = {
             asi: true,
             es5: true,
             ignoreWarning: _isMatch(filepath, this._ignoreWarning)
         }
+        this._currentCache = 
+        {
+            mtime: mtime,
+            validMethods: [],
+            checkTargets: [],
+            requires: []
+        };
+        this._cache[filepath] = this._currentCache;
         if (jshint(data, option))
         {
             this._runCheck(jshint.tokens(), filepath, option.ignoreWarning);
@@ -340,7 +430,6 @@ var SpellChecker = function () {
                     case "Mixed spaces and tabs.":
                         break;
                     default:
-                        console.log("@" + error.raw + "@");
                         fatalError = true;
                         break;
                     }
