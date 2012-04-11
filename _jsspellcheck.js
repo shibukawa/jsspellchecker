@@ -95,7 +95,7 @@ var SpellChecker = function () {
         return path.join(dir, filepath);
     };
 
-    this._findMethodName = function (tokens, sourcepath)
+    this._findMethodName = function (tokens, sourcepath, ignoreWarning)
     {
         var i = 0;
         for (;;)
@@ -122,7 +122,7 @@ var SpellChecker = function () {
                 }
                 else if (tokens[i - 1].identifier && tokens[i - 2].value === ".")
                 {
-                    if (!startsWithNew(tokens, i))
+                    if (!startsWithNew(tokens, i) && !ignoreWarning)
                     {
                         this._checkTarget.push({methodname: tokens[i - 1].value, line: token.line, col: tokens[i - 1].from, filepath: sourcepath});
                     }
@@ -230,9 +230,9 @@ var SpellChecker = function () {
         return [];
     };
 
-    this._runCheck = function (tokens, filepath)
+    this._runCheck = function (tokens, filepath, ignoreWarning)
     {
-        this._findMethodName(tokens, filepath);
+        this._findMethodName(tokens, filepath, ignoreWarning);
         var requires = this._requires;
         this._requires = [];
         for (var i = 0; i < requires.length; ++i)
@@ -314,7 +314,7 @@ var SpellChecker = function () {
         }
         if (jshint(data, option))
         {
-            this._runCheck(jshint.tokens(), filepath);
+            this._runCheck(jshint.tokens(), filepath, option.ignoreWarning);
         }
         else //if (!option.ignoreWarning)
         {
@@ -327,13 +327,20 @@ var SpellChecker = function () {
                 {
                     error.filepath = filepath;
                     this._syntaxErrors.push(error);
-                    switch (error.reason)
+                    switch (error.raw)
                     {
                     case "Missing semicolon.":
                         break;
                     case "Extra comma.":
                         break;
+                    case "'{a}' is already defined.":
+                        break;
+                    case "Bad line breaking before '{a}'.":
+                        break;
+                    case "Mixed spaces and tabs.":
+                        break;
                     default:
+                        console.log("@" + error.raw + "@");
                         fatalError = true;
                         break;
                     }
